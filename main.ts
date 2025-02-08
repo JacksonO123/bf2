@@ -1,4 +1,4 @@
-const input = await Bun.file("input.bf2").text();
+const input = await Bun.file("input/input1.bf2").text();
 const stdout = process.stdout;
 
 const exprs = input.split(/\||\n/).filter((cmd) => cmd !== "");
@@ -30,19 +30,34 @@ function scanLabels(cmds: string[]) {
   });
 }
 
+function getExprNumber(num: string) {
+  if (num === "#") return buffer[current];
+
+  const res = +num;
+  if (isNaN(res)) throw new Error("expected number");
+  if (res < 0) throw new Error("unexpected skill issue (negative number)");
+
+  return res;
+}
+
 function runExpr(expr: string) {
   const parts = expr.split(" ");
   if (parts.length > 1) {
     const first = parts[0];
 
-    if (isNaN(+first) || first === "0") {
+    if (first !== "#" && (isNaN(+first) || first === "0")) {
       switch (first) {
         case "@": {
-          buffer[current] = +parts[1];
+          buffer[current] = getExprNumber(parts[1]);
           break;
         }
         case "$": {
-          if (buffer[current] === 1) runExpr(parts[1]);
+          console.log(buffer[current], buffer[current] === 1, buffer);
+          if (buffer[current] === 1) runExpr(parts.slice(1).join(" "));
+          break;
+        }
+        case "!$": {
+          if (buffer[current] === 0) runExpr(parts.slice(1).join(" "));
           break;
         }
         default:
@@ -52,11 +67,13 @@ function runExpr(expr: string) {
       return;
     }
 
-    const numTimes = +first;
+    const numTimes = getExprNumber(first);
 
     for (let i = 0; i < numTimes; i++) {
       runCmd(parts[1]);
     }
+
+    return;
   }
 
   runCmd(parts[0]);
@@ -84,6 +101,10 @@ function runCmd(cmd: string) {
       stdout.write(String.fromCharCode(buffer[current]));
       break;
     }
+    case ",": {
+      stdout.write(buffer[current] + "");
+      break;
+    }
     case ">": {
       current = Math.min(buffer.length, current + 1);
       break;
@@ -99,6 +120,10 @@ function runCmd(cmd: string) {
     case "~": {
       const to = returnPos.pop();
       if (to) currentCmd = to;
+      break;
+    }
+    case "*": {
+      returnPos.pop();
       break;
     }
     default:
